@@ -137,6 +137,16 @@ func (d *DeviceDiscovery) reconcile(ctx context.Context) error {
 			continue
 		}
 
+		ofedVersion := d.hostManager.DiscoverOfedVersion()
+		recommendedFirmware := helper.GetRecommendedFwVersion(nicDeviceCR.Status.Type, ofedVersion)
+		setFwConfigConditionsForDevice(&nicDeviceCR, recommendedFirmware)
+
+		err = d.Client.Status().Update(ctx, &nicDeviceCR)
+		if err != nil {
+			log.Log.Error(err, "failed to update NicDevice CR status", "device", nicDeviceCR.Name)
+			continue
+		}
+
 		// Need to nullify conditions for deep equal
 		observedDeviceStatus.Conditions = nicDeviceCR.Status.Conditions
 
@@ -191,16 +201,6 @@ func (d *DeviceDiscovery) reconcile(ctx context.Context) error {
 		device.Status = deviceStatus
 		device.Status.Node = d.nodeName
 		setInitialsConditionsForDevice(device)
-
-		ofedVersion := d.hostManager.DiscoverOfedVersion()
-		recommendedFirmware := helper.GetRecommendedFwVersion(device.Status.Type, ofedVersion)
-		setFwConfigConditionsForDevice(device, recommendedFirmware)
-
-		err = d.Client.Status().Update(ctx, device)
-		if err != nil {
-			log.Log.Error(err, "failed to update NicDevice CR status", "device", deviceName)
-			continue
-		}
 	}
 	return nil
 }
